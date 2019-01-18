@@ -11,27 +11,22 @@ import UIKit
 class BoxOfficeDetailViewController: UIViewController {
     //MARK:- Property
     private var comments: [Comment] = []
-    var movieDetail: MovieDetail?
-    var movieId: String? //이전 화면에서 넘겨준 영화 id를 받음
+    private let boxOfficeAPI = BoxOfficeAPI()
+    private var movieDetail: MovieDetail?
+    public var movieId: String? //이전 화면에서 넘겨준 영화 id를 받음
     
     //MARK:- IBOutlet
     @IBOutlet var tableView: UITableView!
     @IBOutlet var indicator: UIActivityIndicatorView!
     
     //MARK:- Life Cycle
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        
-    }
-
     override func viewDidLoad() {
         super.viewDidLoad()
     
-        guard let movieId = movieId else { return }
         indicator.startAnimating()
         
-        requestMovieDetail(id: movieId)
-        requestComments(id: movieId)
+        fetchMovieDetail()
+        fetchComments()
         
         navigationController?.navigationBar.topItem?.title = "영화목록"
         navigationController?.navigationBar.tintColor = UIColor.white
@@ -49,82 +44,58 @@ class BoxOfficeDetailViewController: UIViewController {
         self.present(boxOfficeMovieThumbModalViewController, animated: true, completion: nil)
     }
     
-    //영화 상세정보 서버에 요청
-    func requestMovieDetail(id: String) {
-        let baseURL = "http://connect-boxoffice.run.goorm.io/movie?id="
-        
+    //영화 상세정보 서버에 요청å
+    func fetchMovieDetail() {
         guard let movieId = movieId else { return }
-        guard let url = URL(string: baseURL + movieId) else { return }
-
-        let session = URLSession(configuration: .default)
-        
-        let dataTask = session.dataTask(with: url) { [weak self] (data: Data?, response: URLResponse?, error: Error?) in
-            guard let self = self else { return }
-            if let error = error {
-                self.alert("데이터 수신 실패")
-                print("error in dataTask: \(error.localizedDescription)")
+        boxOfficeAPI.requestMovieDetail(id: movieId) { [weak self]  result, isSucceed in
+            guard let self = self else {
                 return
             }
             
-            guard let data = data else {
-                print("data unwrapping error")
-                return
-            }
-            
-            do {
-                let movieDetailApiResponse: MovieDetail = try JSONDecoder().decode(MovieDetail.self, from: data)
-                self.movieDetail = movieDetailApiResponse
-                
-                DispatchQueue.main.async {
-                    self.tableView.reloadData()
-                    self.indicator.stopAnimating()
-                }
-                
-            } catch let error {
-                print(error.localizedDescription)
-                
+            if !isSucceed {
                 self.alert("데이터를 수신 실패.")
+                return
+            }
+            
+            guard let result = result else {
+                self.alert("데이터를 수신 실패.")
+                return
+            }
+            
+            self.movieDetail = result
+            
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+                self.indicator.stopAnimating()
             }
         }
-        dataTask.resume()
     }
-
-    func requestComments(id: String) {
-        let baseURL = "http://connect-boxoffice.run.goorm.io/comments?movie_id="
-        
+    
+    func fetchComments() {
         guard let movieId = movieId else { return }
-        guard let url = URL(string: baseURL + movieId) else { return }
         
-        let session = URLSession(configuration: .default)
-        
-        let dataTask = session.dataTask(with: url) { (data: Data?, response: URLResponse?, error: Error?) in
-            if let error = error {
-                self.alert("데이터 수신 실패")
-                print("error in dataTask: \(error.localizedDescription)")
+        boxOfficeAPI.requestComments(id: movieId) { [weak self]  result, isSucceed in
+            guard let self = self else {
                 return
             }
             
-            guard let data = data else {
-                print("data unwrapping error")
-                return
-            }
-            
-            do {
-                let commentsApiResponse: CommentApiResponse = try JSONDecoder().decode(CommentApiResponse.self, from: data)
-                guard let comments = commentsApiResponse.comments else { return }
-                self.comments = comments
-                
-                DispatchQueue.main.async {
-                    self.tableView.reloadData()
-                    self.indicator.stopAnimating()
-                }
-                
-            } catch let error {
-                print(error.localizedDescription)
+            if !isSucceed {
                 self.alert("데이터를 수신 실패.")
+                return
+            }
+            
+            guard let result = result else {
+                self.alert("데이터를 수신 실패.")
+                return
+            }
+            
+            self.comments = result
+            
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+                self.indicator.stopAnimating()
             }
         }
-        dataTask.resume()
     }
 }
 
